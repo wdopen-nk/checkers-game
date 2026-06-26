@@ -52,6 +52,7 @@ beta :: Int
 beta = 10000
 
 -- Initialize the board with pieces in their starting positions
+
 initialBoard :: Board
 initialBoard =
     Map.fromList $ blackPieces ++ whitePieces
@@ -63,16 +64,21 @@ blackSquare :: Position -> Bool
 blackSquare (r, c) = odd (r + c)
 
 -- Check if a position is within the bounds of the board
+
 insideBoard :: Position -> Bool
 insideBoard (r, c) = 
     r >= 0 && r < boardSize && c >= 0 && c < boardSize
 
+
 -- Get the opponent of a player
+
 opponent :: Player -> Player
 opponent White = Black
 opponent Black = White
 
+
 -- Get the possible move directions for a piece
+
 directions :: Piece -> [(Int, Int)]
 directions (Piece White Man) = [(-1, -1), (-1, 1)]
 directions (Piece Black Man) = [(1, -1), (1, 1)]
@@ -90,7 +96,9 @@ belongsTo :: Player -> Piece -> Bool
 belongsTo player (Piece owner _) = 
     owner == player
 
+
 -- Generate all possible moves for a piece at a given position
+
 normalMoves :: Board -> Position -> Piece -> [Move]
 normalMoves board (r, c) piece =
     [ Move (r, c) (r + dr, c + dc) Nothing
@@ -98,7 +106,10 @@ normalMoves board (r, c) piece =
     , let newPos = (r + dr, c + dc)
     , isEmpty board newPos
     ]
+
+
 -- Generate all possible capture moves for a piece at a given position
+
 captureMoves :: Board -> Position -> Piece -> [Move]
 captureMoves board (r, c) piece =
     [ Move (r, c) (r + 2 * dr, c + 2 * dc) (Just (r + dr, c + dc))
@@ -114,3 +125,49 @@ captureMoves board (r, c) piece =
 
 pieceOwner :: Piece -> Player
 pieceOwner (Piece owner _) = owner
+
+-- Generate all possible capture moves for a player
+
+allCaptureMoves :: Board -> Player -> [Move]
+allCaptureMoves board player =
+    concat [captureMoves board position piece | (position, piece) <- Map.toList board, belongsTo player piece]
+
+-- Generate all possible normal moves for a player
+
+allNormalMoves :: Board -> Player -> [Move]
+allNormalMoves board player =
+    concat [normalMoves board position piece | (position, piece) <- Map.toList board, belongsTo player piece]
+
+-- Get all allowed moves for a player, prioritizing captures over normal moves
+
+allowedMoves :: Board -> Player -> [Move]
+allowedMoves board player =
+    let captures = allCaptureMoves board player
+    in if not (null captures)
+       then captures
+       else allNormalMoves board player
+
+-- Apply a move to the board, returning the new board state
+
+moveOnBoard :: Board -> Move -> Board
+moveOnBoard board (Move from to captured) =
+    case Map.lookup from board of
+        Nothing -> board
+
+        Just piece ->
+            let promoted = promoteToKing to piece
+                board1 = Map.delete from board
+                board2 =
+                    case captured of
+                        Nothing -> board1
+                        Just capturedPosition -> Map.delete capturedPosition board1
+            in Map.insert to promoted board2
+
+promoteToKing :: Position -> Piece -> Piece
+promoteToKing (r, _) (Piece White Man)
+    | r == 0 = Piece White King
+
+promoteToKing (r, _) (Piece Black Man)
+    | r == boardSize - 1 = Piece Black King
+
+promoteToKing _ piece = piece
