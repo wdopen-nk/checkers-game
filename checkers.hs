@@ -171,3 +171,60 @@ promoteToKing (r, _) (Piece Black Man)
     | r == boardSize - 1 = Piece Black King
 
 promoteToKing _ piece = piece
+
+-- Check if a player has any pieces left on the board
+
+hasPieces :: Board -> Player -> Bool
+hasPieces board player =
+    any (belongsTo player) (Map.elems board)
+
+
+winner :: Board -> Maybe Player
+winner board
+    | not (hasPieces board Black) = Just White
+    | not (hasPieces board White) = Just Black
+    | null (allowedMoves board Black) = Just White
+    | null (allowedMoves board White) = Just Black
+    | otherwise = Nothing
+
+
+-- Evaluate the board state for the computer player (White) and the human player (Black)
+
+evaluate :: Board -> Int
+evaluate board = sum [pieceValue piece | piece <- Map.elems board]
+  where
+    pieceValue (Piece Black Man) = -1
+    pieceValue (Piece Black King) = -3
+    pieceValue (Piece White Man) = 1
+    pieceValue (Piece White King) = 3
+
+
+-- Alpha-beta pruning algorithm to find the best move for the computer player (White)
+
+alphaBeta :: Int -> Int -> Int -> Player -> Board -> Int
+alphaBeta depth alpha beta player board =
+    case winner board of
+        Just Black -> winForBlack
+        Just White -> winForWhite
+        Nothing
+            | depth == 0 -> evaluate board
+            | player == Black -> maximize alpha beta (allowedMoves board player)
+            | player == White -> minimize alpha beta (allowedMoves board player)
+
+        where
+            maximize a b [] = a
+            maximize a b (move : moves) =
+                let score = alphaBeta (depth - 1) a b (opponent player) (moveOnBoard board move)
+                    a_max = max a score
+                in if a_max >= b
+                   then a_max
+                   else maximize a_max b moves
+
+            
+            minimize a b [] = b
+            minimize a b (move : moves) =
+                let score = alphaBeta (depth - 1) a b (opponent player) (moveOnBoard board move)
+                    b_min = min b score
+                in if b_min <= a
+                   then b_min
+                   else minimize a b_min moves
